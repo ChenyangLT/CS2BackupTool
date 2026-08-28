@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+*.log
+ai_cache/
+Backups/
+*.exe
+selftest_result.txt
+smoke_result.txt
+main_shot.png
+user_shot.png
+/*.png
