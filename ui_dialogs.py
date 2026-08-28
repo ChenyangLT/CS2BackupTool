@@ -1,6 +1,7 @@
 """对话框：设置（白色主题）、恢复目标选择。"""
 
 import os
+import shutil
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDoubleSpinBox,
@@ -137,8 +138,10 @@ class SettingsDialog(QDialog):
         }
 
     def _save(self):
+        old_dir = self.settings.get('backup_dir') or ''
+        new_dir = self.ed_backup.text().strip()
         self.settings.data['steam_path'] = self.ed_steam.text().strip()
-        self.settings.data['backup_dir'] = self.ed_backup.text().strip()
+        self.settings.data['backup_dir'] = new_dir
         self.settings.data['max_per_page'] = self.sp_page.value()
         self.settings.data['zip_compress'] = self.sp_zip.value()
         self.settings.data['proxy'] = self.ed_proxy.text().strip()
@@ -149,8 +152,40 @@ class SettingsDialog(QDialog):
         except Exception as e:
             QMessageBox.warning(self, '保存失败', str(e))
             return
+        self._migrate_backups(old_dir, new_dir)
         self._apply_logging()
         self.accept()
+
+    def _migrate_backups(self, old_dir, new_dir):
+        """备份目录变更时，询问是否一键迁移已有备份。"""
+        if not new_dir or not old_dir:
+            return
+        if os.path.normcase(os.path.normpath(old_dir)) == os.path.normcase(os.path.normpath(new_dir)):
+            return
+        if not os.path.isdir(old_dir):
+            return
+        zips = [f for f in os.listdir(old_dir) if f.lower().endswith('.zip')]
+        if not zips:
+            return
+        ret = QMessageBox.question(
+            self, '📦 迁移备份',
+            f'原备份目录中有 {len(zips)} 个备份文件。\n是否一键迁移到新目录？\n\n{old_dir}\n⬇\n{new_dir}',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        if ret != QMessageBox.Yes:
+            return
+        try:
+            os.makedirs(new_dir, exist_ok=True)
+        except Exception as e:
+            QMessageBox.warning(self, '迁移失败', f'无法创建新目录: {e}')
+            return
+        moved = 0
+        for f in zips:
+            try:
+                shutil.move(os.path.join(old_dir, f), os.path.join(new_dir, f))
+                moved += 1
+            except Exception:
+                pass
+        QMessageBox.information(self, '✅ 迁移完成', f'已迁移 {moved}/{len(zips)} 个备份文件到新目录。')
 
     def _apply_values(self):
         """把 settings 里的值同步到界面控件。"""

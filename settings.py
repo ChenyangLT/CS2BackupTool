@@ -78,7 +78,7 @@ class Settings:
 def default_backup_dir():
     """返回一个可写的默认备份目录。"""
     if getattr(sys, 'frozen', False):
-        here = os.path.dirname(os.path.abspath(sys.argv[0]))
+        here = os.path.dirname(os.path.abspath(sys.executable))
     else:
         here = os.path.dirname(os.path.abspath(__file__))
     candidates = [

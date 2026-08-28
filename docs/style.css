@@ -90,7 +90,7 @@ section .sub { text-align: center; color: var(--muted); margin-bottom: 40px; }
 
 /* ---------- 截图（3D 倾斜） ---------- */
 .screenshots { max-width: 1100px; margin: 0 auto; }
-.shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 30px; }
+.shots { display: flex; flex-direction: column; gap: 48px; max-width: 760px; margin: 0 auto; }
 .shot-card { text-align: center; transition: transform .35s ease, box-shadow .35s ease; transform-style: preserve-3d; }
 .shot-frame {
   border-radius: 18px; padding: 12px;
@@ -100,8 +100,27 @@ section .sub { text-align: center; color: var(--muted); margin-bottom: 40px; }
   transition: box-shadow .35s ease;
 }
 .shot-card:hover .shot-frame { box-shadow: 0 34px 70px rgba(37,99,235,.35); }
-.shot-frame img { width: 100%; border-radius: 10px; display: block; }
+.shot-frame img { width: 100%; border-radius: 10px; display: block; cursor: zoom-in; }
 .shot-card span { display: inline-block; margin-top: 16px; color: var(--muted); font-size: 14px; }
+
+/* ---------- 点击放大 lightbox ---------- */
+.lightbox {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(5, 7, 14, .88);
+  backdrop-filter: blur(6px);
+  display: none; align-items: center; justify-content: center;
+  padding: 40px; animation: fadeIn .25s ease;
+}
+.lightbox.open { display: flex; }
+.lightbox img { max-width: 92vw; max-height: 90vh; border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+.lightbox-close {
+  position: absolute; top: 22px; right: 30px;
+  width: 46px; height: 46px; line-height: 46px; text-align: center;
+  font-size: 24px; color: #fff; background: rgba(255,255,255,.12);
+  border-radius: 50%; cursor: pointer; transition: background .2s, transform .2s;
+}
+.lightbox-close:hover { background: rgba(255,255,255,.25); transform: rotate(90deg); }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 /* ---------- 功能卡片 ---------- */
 .features { max-width: 1000px; margin: 0 auto; }

@@ -34,3 +34,28 @@ document.querySelectorAll('a[href^="#"]').forEach((a) => {
     }
   });
 });
+
+// 点击图片放大（lightbox）
+const lightbox = document.getElementById('lightbox');
+const lightboxImg = document.getElementById('lightbox-img');
+const lightboxClose = document.querySelector('.lightbox-close');
+
+document.querySelectorAll('[data-lightbox]').forEach((img) => {
+  img.addEventListener('click', () => {
+    lightboxImg.src = img.src;
+    lightbox.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  });
+});
+
+function closeLightbox() {
+  lightbox.classList.remove('open');
+  document.body.style.overflow = '';
+}
+lightbox.addEventListener('click', (e) => {
+  if (e.target !== lightboxImg) closeLightbox();
+});
+lightboxClose.addEventListener('click', closeLightbox);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeLightbox();
+});

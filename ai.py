@@ -2,6 +2,7 @@
 
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 
@@ -66,11 +67,23 @@ def _chat(ai_cfg, messages, max_tokens=None, temperature=None):
         raise AISummaryError('API 返回格式异常: ' + json.dumps(data, ensure_ascii=False)[:500])
 
 
+def _read_text_robust(path, retries=3, delay=0.3):
+    """读取文本文件，失败自动重试（应对 Steam 云同步等造成的短暂占用/句柄失效）。"""
+    last = None
+    for _ in range(retries):
+        try:
+            with open(path, 'r', encoding='utf-8', errors='replace') as f:
+                return f.read()
+        except Exception as e:
+            last = e
+            time.sleep(delay)
+    raise last
+
+
 def annotate_cfg(ai_cfg, file_path):
     """读取 cfg 文件，让 AI 逐行添加中文注释后返回完整带注释内容。"""
     try:
-        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
-            content = f.read()
+        content = _read_text_robust(file_path)
     except Exception as e:
         raise AISummaryError(f'读取文件失败: {e}')
 

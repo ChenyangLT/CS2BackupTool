@@ -604,7 +604,12 @@ class UserWindow(QWidget):
         if not (ai.get('api_key') or '').strip():
             QMessageBox.information(self, '提示', '未配置 API Key，请在「⚙️ 设置 → AI 注释」中填写。')
             return
-        if self._ai_worker is not None and self._ai_worker.isRunning():
+        try:
+            busy = self._ai_worker is not None and self._ai_worker.isRunning()
+        except RuntimeError:
+            busy = False
+            self._ai_worker = None
+        if busy:
             QMessageBox.information(self, '提示', 'AI 注释任务进行中，请稍候')
             return
         # 命中本地缓存则直接复用，节约 token
@@ -622,11 +627,13 @@ class UserWindow(QWidget):
         w = AIWorker(cfg, file_path, self)
 
         def on_done(text):
+            self._ai_worker = None
             ai_cache.put_cached(file_path, text)
             self.ai_text.setPlainText(text)
             self._set_ai_busy(False)
             self.status.setText('✅ AI 注释完成，可在右侧查看，并可 💾 保存 / 📄 另存为。')
         def on_failed(msg):
+            self._ai_worker = None
             self.ai_text.setPlainText('❌ 注释失败：\n' + msg)
             self._set_ai_busy(False)
         w.done.connect(on_done)

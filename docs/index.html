@@ -45,23 +45,23 @@
 
 <section id="screenshots" class="screenshots">
   <h2 class="reveal">界面预览</h2>
-  <p class="sub reveal">🖱 把鼠标移到截图上，体验 3D 视角</p>
+  <p class="sub reveal">🖱 鼠标悬停体验 3D 视角 · 点击图片放大查看</p>
   <div class="shots">
     <div class="shot-card reveal" data-tilt>
       <div class="shot-frame">
-        <img src="assets/主页图片.png" alt="主页界面">
+        <img src="assets/主页图片.png" alt="主页界面" data-lightbox>
       </div>
       <span>🏠 主页 · 账户卡片</span>
     </div>
     <div class="shot-card reveal" data-tilt>
       <div class="shot-frame">
-        <img src="assets/备份界面.png" alt="备份界面">
+        <img src="assets/备份界面.png" alt="备份界面" data-lightbox>
       </div>
       <span>📦 备份 / 恢复 / AI 注释</span>
     </div>
     <div class="shot-card reveal" data-tilt>
       <div class="shot-frame">
-        <img src="assets/设置界面.png" alt="设置界面">
+        <img src="assets/设置界面.png" alt="设置界面" data-lightbox>
       </div>
       <span>⚙️ 设置</span>
     </div>
@@ -94,6 +94,11 @@
 <footer>
   <p>© 2025 Chen_yang_ · CS2 配置备份工具 · Deepseek V4 Pro Vibe Coding 打造</p>
 </footer>
+
+<div id="lightbox" class="lightbox" aria-hidden="true">
+  <span class="lightbox-close">✕</span>
+  <img id="lightbox-img" src="" alt="预览大图">
+</div>
 
 <script src="main.js"></script>
 </body>

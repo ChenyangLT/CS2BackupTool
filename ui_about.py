@@ -10,7 +10,7 @@ from ui_common import (ClickableLabel, circular_pixmap, default_avatar,
                        load_app_icon, open_url)
 from workers import BilibiliWorker
 
-APP_VERSION = '1.3.0'
+APP_VERSION = '1.4.0'
 
 
 class AboutDialog(QDialog):
