@@ -21,6 +21,7 @@ DEFAULTS = {
     'zip_compress': 6,      # zip 压缩等级 (0-9)
     'proxy': '',            # 代理 (http://127.0.0.1:7890)，用于头像抓取 / AI 请求
     'debug_log': False,     # 调试日志开关（默认关闭）
+    'known_accounts': {},   # 已备份账户信息（换机后仍可显示）
     'ai': dict(DEFAULT_AI),
 }
 
@@ -73,6 +74,23 @@ class Settings:
     def reset_defaults(self):
         """恢复所有默认配置。"""
         self.data = json.loads(json.dumps(DEFAULTS))
+
+    def remember_account(self, account):
+        """保存已备份账户的信息，便于换机后仍能显示（含当前未检测到的账户）。"""
+        known = self.data.setdefault('known_accounts', {})
+        key = str(account.account_id) if account.account_id is not None else \
+            (account.steam_id64 or account.account_name or 'unknown')
+        known[key] = {
+            'account_name': account.account_name or '',
+            'persona_name': account.persona_name or '',
+            'steam_id64': account.steam_id64 or '',
+            'account_id': account.account_id,
+            'avatar_hash': account.avatar_hash or '',
+        }
+        try:
+            self.save()
+        except Exception:
+            pass
 
 
 def default_backup_dir():

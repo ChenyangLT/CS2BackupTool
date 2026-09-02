@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel,
 
 from settings import Settings, default_backup_dir
 from steam import avatar_path as steam_avatar_path
-from steam import detect_steam_path, find_csgo_cfg_dir, load_accounts
+from steam import Account, detect_steam_path, find_csgo_cfg_dir, load_accounts
 from ui_common import (ClickableLabel, avatar_for, load_app_icon, open_path,
                        open_url)
 from ui_dialogs import SettingsDialog
@@ -55,11 +55,15 @@ class UserCard(QFrame):
         id_lbl.setAlignment(Qt.AlignCenter)
         id_lbl.setStyleSheet('color:#6b7280; font-size:12px;')
 
-        exists = account.has_730 and not account.is_730_empty()
-        if exists:
-            status = QLabel('📦 730：<span style="color:#16a34a; font-weight:600;">存在</span>')
+        if getattr(account, 'not_found', False):
+            status = QLabel('<span style="color:#dc2626; font-weight:600;">未发现</span>')
+            self.setToolTip('该账户已在别处备份，但当前电脑未检测到（Steam 未登录此账户）')
         else:
-            status = QLabel('📦 730：<span style="color:#dc2626; font-weight:600;">不存在</span>')
+            exists = account.has_730 and not account.is_730_empty()
+            if exists:
+                status = QLabel('📦 730：<span style="color:#16a34a; font-weight:600;">存在</span>')
+            else:
+                status = QLabel('📦 730：<span style="color:#dc2626; font-weight:600;">不存在</span>')
         status.setAlignment(Qt.AlignCenter)
         status.setTextFormat(Qt.RichText)
         status.setStyleSheet('font-size:12px;')
@@ -196,6 +200,26 @@ class MainWindow(QMainWindow):
                 self.accounts = load_accounts(steam_path)
             except Exception as e:
                 self.status.setText(f'读取 Steam 账户失败: {e}')
+        # 合并已备份但当前未检测到的账户（换机场景）
+        known = self.settings.data.get('known_accounts') or {}
+        if known:
+            detected_ids = {a.account_id for a in self.accounts if a.account_id is not None}
+            detected_sids = {a.steam_id64 for a in self.accounts if a.steam_id64}
+            for _key, info in known.items():
+                aid = info.get('account_id')
+                sid = info.get('steam_id64') or ''
+                if aid is not None and aid in detected_ids:
+                    continue
+                if sid and sid in detected_sids:
+                    continue
+                ghost = Account(account_name=info.get('account_name') or '',
+                                persona_name=info.get('persona_name') or '',
+                                steam_id64=sid or None,
+                                avatar_hash=info.get('avatar_hash') or '',
+                                userdata_dir=None)
+                ghost.not_found = True
+                self.accounts.append(ghost)
+            self.accounts.sort(key=lambda a: a.display_name.lower())
         self.max_per_page = int(self.settings.get('max_per_page') or 6)
         self.page = 0
         self._rebuild()

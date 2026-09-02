@@ -14,7 +14,7 @@ import ai_cache
 import backup as bk
 from ui_common import avatar_for, load_app_icon, make_button, open_path
 from ui_dialogs import RestoreDialog
-from workers import AIWorker, BackupWorker, RestoreWorker
+from workers import AIWorker, BackupWorker, GenerateWorker, RestoreWorker
 
 
 class UserWindow(QWidget):
@@ -27,6 +27,7 @@ class UserWindow(QWidget):
         self._backup_worker = None
         self._restore_worker = None
         self._ai_worker = None
+        self._gen_worker = None
         self._ai_saved_path = None
         self.backup_infos = []
         self._current_rows = []
@@ -227,12 +228,12 @@ class UserWindow(QWidget):
         v.setContentsMargins(4, 4, 4, 4)
 
         hdr = QHBoxLayout()
-        title = QLabel('🤖 AI 注释')
+        title = QLabel('🤖 AI 助手')
         title.setStyleSheet('font-size:15px; font-weight:bold;')
         hdr.addWidget(title)
         hdr.addStretch(1)
         self.chk_expand = QCheckBox('📂 展开显示')
-        self.chk_expand.setChecked(False)
+        self.chk_expand.setChecked(True)
         self.chk_expand.toggled.connect(self._toggle_ai_panel)
         hdr.addWidget(self.chk_expand)
         v.addLayout(hdr)
@@ -248,6 +249,12 @@ class UserWindow(QWidget):
         selrow.addWidget(self.btn_ai)
         v.addLayout(selrow)
 
+        self.ai_text = QTextEdit()
+        self.ai_text.setReadOnly(True)
+        self.ai_text.setPlaceholderText('选择 cfg 文件后可查看原始内容；点击「开始注释」让 AI 逐行添加中文注释；也可在下方直接提问生成 cfg。')
+        self.ai_text.setVisible(True)
+        v.addWidget(self.ai_text, 1)
+
         srow = QHBoxLayout()
         self.btn_save = QPushButton('💾 保存')
         self.btn_save.clicked.connect(self._save_ai)
@@ -260,11 +267,17 @@ class UserWindow(QWidget):
         srow.addWidget(self.btn_copy)
         v.addLayout(srow)
 
-        self.ai_text = QTextEdit()
-        self.ai_text.setReadOnly(True)
-        self.ai_text.setPlaceholderText('选择 cfg 文件后可查看原始内容；点击「开始注释」让 AI 逐行添加中文注释。')
-        self.ai_text.setVisible(False)
-        v.addWidget(self.ai_text, 1)
+        chat_lbl = QLabel('💬 向 AI 提问，直接生成 cfg')
+        chat_lbl.setStyleSheet('color:#6b7280; font-size:12px; margin-top:6px;')
+        v.addWidget(chat_lbl)
+        self.chat_input = QTextEdit()
+        self.chat_input.setFixedHeight(72)
+        self.chat_input.setPlaceholderText('例如：生成一个练枪 autoexec.cfg，含蹲跳绑定、灵敏度 2.5、一键清血迹')
+        v.addWidget(self.chat_input)
+        self.btn_generate = QPushButton('🤖 生成 cfg')
+        self.btn_generate.setObjectName('primary')
+        self.btn_generate.clicked.connect(self._generate_cfg)
+        v.addWidget(self.btn_generate)
         return panel
 
     # ------------------------------------------------------------ 备份列表
@@ -399,6 +412,7 @@ class UserWindow(QWidget):
         def on_done(info):
             dlg.close()
             self._backup_worker = None
+            self.settings.remember_account(self.account)
             self.status.setText(
                 f'✅ 备份完成\n📦 文件: {os.path.basename(info.path)}\n'
                 f'🕒 时间: {info.created}\n📏 大小: {bk._human_size(info.size)} · 文件数: {info.file_count}')
@@ -646,6 +660,7 @@ class UserWindow(QWidget):
         self.btn_ai.setEnabled(not busy)
         self.btn_save.setEnabled(not busy)
         self.btn_saveas.setEnabled(not busy)
+        self.btn_generate.setEnabled(not busy)
 
     def _ai_content_ok(self):
         text = self.ai_text.toPlainText()
@@ -696,3 +711,46 @@ class UserWindow(QWidget):
 
     def _copy_ai(self):
         QApplication.clipboard().setText(self.ai_text.toPlainText())
+
+    def _generate_cfg(self):
+        """向 AI 提问，直接生成一份 cfg。"""
+        prompt = self.chat_input.toPlainText().strip()
+        if not prompt:
+            QMessageBox.information(self, '提示', '请先输入你的需求，例如：生成一个练枪 autoexec.cfg')
+            return
+        ai = self.settings.data.get('ai', {})
+        if not ai.get('enabled', True):
+            QMessageBox.information(self, '提示', 'AI 功能未启用，请在「⚙️ 设置」中开启并填写 API Key。')
+            return
+        if not (ai.get('api_key') or '').strip():
+            QMessageBox.information(self, '提示', '未配置 API Key，请在「⚙️ 设置 → AI 助手」中填写。')
+            return
+        try:
+            busy = self._gen_worker is not None and self._gen_worker.isRunning()
+        except RuntimeError:
+            busy = False
+            self._gen_worker = None
+        if busy:
+            QMessageBox.information(self, '提示', 'AI 生成任务进行中，请稍候')
+            return
+        cfg = dict(ai)
+        cfg['proxy'] = self.settings.get('proxy') or ''
+        self.ai_text.setPlainText('🤖 正在生成 cfg，请稍候…')
+        self.chk_expand.setChecked(True)
+        self._set_ai_busy(True)
+        w = GenerateWorker(cfg, prompt, self)
+
+        def on_done(text):
+            self._gen_worker = None
+            self.ai_text.setPlainText(text)
+            self._set_ai_busy(False)
+            self.status.setText('✅ cfg 已生成，可 💾 保存 / 📄 另存为。')
+        def on_failed(msg):
+            self._gen_worker = None
+            self.ai_text.setPlainText('❌ 生成失败：\n' + msg)
+            self._set_ai_busy(False)
+        w.done.connect(on_done)
+        w.failed.connect(on_failed)
+        self._gen_worker = w
+        w.finished.connect(w.deleteLater)
+        w.start()

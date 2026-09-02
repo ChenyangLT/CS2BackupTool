@@ -154,3 +154,24 @@ class BilibiliWorker(QThread):
         except Exception as e:
             logutil.get_logger().error('Bilibili 信息获取失败: %s', e)
             self.failed.emit(str(e))
+
+
+class GenerateWorker(QThread):
+    done = Signal(str)
+    failed = Signal(str)
+
+    def __init__(self, ai_cfg, prompt, parent=None):
+        super().__init__(parent)
+        self.ai_cfg = ai_cfg
+        self.prompt = prompt
+
+    def run(self):
+        try:
+            result = ai_mod.generate_cfg(self.ai_cfg, self.prompt)
+            self.done.emit(result)
+        except ai_mod.AISummaryError as e:
+            logutil.get_logger().error('AI 生成失败: %s', e)
+            self.failed.emit(str(e))
+        except Exception as e:
+            logutil.get_logger().error('AI 生成异常: %s', e, exc_info=True)
+            self.failed.emit(str(e))
