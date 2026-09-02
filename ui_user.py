@@ -10,8 +10,10 @@ from PySide6.QtWidgets import (QAbstractItemView, QApplication, QCheckBox,
                                QSplitter, QTabWidget, QTableWidget, QTableWidgetItem,
                                QTextEdit, QVBoxLayout, QWidget)
 
+import ai as ai_mod
 import ai_cache
 import backup as bk
+import logger as logutil
 from ui_common import avatar_for, load_app_icon, make_button, open_path
 from ui_dialogs import RestoreDialog
 from workers import AIWorker, BackupWorker, GenerateWorker, RestoreWorker
@@ -633,12 +635,20 @@ class UserWindow(QWidget):
             self.chk_expand.setChecked(True)
             self.status.setText('📦 命中本地缓存（cfg 文件未变更，未消耗 token）')
             return
+        # 在主线程读取文件内容（带重试、二进制方式），避免线程中读文件偶发「句柄无效」
+        try:
+            content = ai_mod.read_cfg_text(file_path)
+        except Exception as e:
+            logutil.get_logger().error('读取 cfg 失败: %s -> %s', file_path, e)
+            self.ai_text.setPlainText(f'❌ 读取文件失败：\n{file_path}\n\n{e}\n\n（若持续失败，请关闭 CS2 / Steam 后重试）')
+            return
+        filename = os.path.basename(file_path)
         cfg = dict(ai)
         cfg['proxy'] = self.settings.get('proxy') or ''
         self.ai_text.setPlainText('🤖 正在请求 AI 逐行注释，请稍候…\n（根据文件大小与网络，通常需要几秒到几十秒）')
         self.chk_expand.setChecked(True)
         self._set_ai_busy(True)
-        w = AIWorker(cfg, file_path, self)
+        w = AIWorker(cfg, content, filename, self)
 
         def on_done(text):
             self._ai_worker = None

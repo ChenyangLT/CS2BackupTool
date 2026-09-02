@@ -83,34 +83,23 @@ def _chat(ai_cfg, messages, max_tokens=None, temperature=None):
     raise AISummaryError('AI 请求失败')
 
 
-def _read_text_robust(path, retries=5, delay=0.5):
-    """读取文本文件，失败自动重试；最后回退二进制读取（应对 Steam 云同步造成的短暂占用/句柄失效）。"""
+def read_cfg_text(path, retries=10, delay=0.5):
+    """读取文本文件（二进制方式读取后解码），失败自动重试（应对 Steam 云同步造成的句柄失效）。"""
     last = None
     for _ in range(retries):
         try:
-            with open(path, 'r', encoding='utf-8', errors='replace') as f:
-                return f.read()
+            with open(path, 'rb') as f:
+                return f.read().decode('utf-8', 'replace')
         except Exception as e:
             last = e
             time.sleep(delay)
-    try:
-        with open(path, 'rb') as f:
-            return f.read().decode('utf-8', 'replace')
-    except Exception as e:
-        last = e
     raise last
 
 
-def annotate_cfg(ai_cfg, file_path):
-    """读取 cfg 文件，让 AI 逐行添加中文注释后返回完整带注释内容。"""
-    try:
-        content = _read_text_robust(file_path)
-    except Exception as e:
-        raise AISummaryError(f'读取文件失败: {e}')
-
-    max_chars = 50000
-    if len(content) > max_chars:
-        content = content[:max_chars] + f'\n...(内容过长已截断，共 {len(content)} 字符)'
+def annotate_content(ai_cfg, content, filename=''):
+    """让 AI 为 cfg 内容逐行添加中文注释后返回完整带注释内容。"""
+    if len(content) > 50000:
+        content = content[:50000] + f'\n...(内容过长已截断，共 {len(content)} 字符)'
     if not content.strip():
         raise AISummaryError('文件内容为空')
 
@@ -119,7 +108,7 @@ def annotate_cfg(ai_cfg, file_path):
         '保留每一行原始内容完全不变，在其正下方（或行尾）用 // 添加该命令/绑定/参数的作用说明；'
         '若某行已有注释则在其后补充说明；对配置块（如 bind / alias / 分组）可在块前加一行 // 小节说明。'
         '只输出带注释的完整配置文件内容，不要省略任何原始行，不要输出任何解释性开场白或结尾。\n\n'
-        f'文件名: {os.path.basename(file_path)}\n\n'
+        f'文件名: {filename}\n\n'
         '文件内容如下:\n\n' + content
     )
     return _chat(ai_cfg, [{'role': 'user', 'content': prompt}])

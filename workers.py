@@ -87,14 +87,15 @@ class AIWorker(QThread):
     done = Signal(str)
     failed = Signal(str)
 
-    def __init__(self, ai_cfg, file_path, parent=None):
+    def __init__(self, ai_cfg, content, filename, parent=None):
         super().__init__(parent)
         self.ai_cfg = ai_cfg
-        self.file_path = file_path
+        self.content = content
+        self.filename = filename
 
     def run(self):
         try:
-            result = ai_mod.annotate_cfg(self.ai_cfg, self.file_path)
+            result = ai_mod.annotate_content(self.ai_cfg, self.content, self.filename)
             self.done.emit(result)
         except ai_mod.AISummaryError as e:
             logutil.get_logger().error('AI 注释失败: %s', e)

@@ -12,7 +12,7 @@ import sys
 
 import logger as logutil
 
-APP_VERSION = '1.5.0'
+APP_VERSION = '1.5.1'
 
 
 def _out_file(name):
