@@ -2,6 +2,8 @@
 
 import json
 import os
+import shutil
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -83,13 +85,59 @@ def _chat(ai_cfg, messages, max_tokens=None, temperature=None):
     raise AISummaryError('AI 请求失败')
 
 
-def read_cfg_text(path, retries=10, delay=0.5):
-    """读取文本文件（二进制方式读取后解码），失败自动重试（应对 Steam 云同步造成的句柄失效）。"""
+def _read_bytes_robust(path):
+    """依次尝试多种方式读取文件字节，全部失败抛异常（绕过偶发的「句柄无效」）。"""
+    last = None
+
+    # 方法1：直接二进制读取
+    try:
+        with open(path, 'rb') as f:
+            return f.read()
+    except Exception as e:
+        last = e
+
+    # 方法2：os.open + os.read（绕过 io 缓冲层，全新句柄）
+    try:
+        flags = os.O_RDONLY | getattr(os, 'O_BINARY', 0)
+        fd = os.open(path, flags)
+        try:
+            parts = []
+            while True:
+                b = os.read(fd, 65536)
+                if not b:
+                    break
+                parts.append(b)
+            return b''.join(parts)
+        finally:
+            os.close(fd)
+    except Exception as e:
+        last = e
+
+    # 方法3：先「拉取」复制到临时文件，再读取（换全新路径与句柄）
+    try:
+        tmp = os.path.join(tempfile.gettempdir(),
+                           f'cs2cfg_{os.getpid()}_{int(time.time() * 1000)}.tmp')
+        shutil.copyfile(path, tmp)
+        try:
+            with open(tmp, 'rb') as f:
+                return f.read()
+        finally:
+            try:
+                os.remove(tmp)
+            except Exception:
+                pass
+    except Exception as e:
+        last = e
+
+    raise last
+
+
+def read_cfg_text(path, retries=6, delay=0.5):
+    """读取 cfg 文本：多方法 + 重试，尽量绕过偶发的「句柄无效」。"""
     last = None
     for _ in range(retries):
         try:
-            with open(path, 'rb') as f:
-                return f.read().decode('utf-8', 'replace')
+            return _read_bytes_robust(path).decode('utf-8', 'replace')
         except Exception as e:
             last = e
             time.sleep(delay)
